@@ -1,1 +1,1 @@
-# CounterStrikeHelper
+CounterStrike Project
