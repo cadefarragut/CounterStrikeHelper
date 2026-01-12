@@ -5,6 +5,9 @@
 #include <fstream>
 #include <map>
 #include <algorithm>
+#include <nlohmann/json.hpp>
+#include <optional>
+using json = nlohmann::json;
 
 void Config::load_from_env_file(Config& config) {
     // Load .env file from project root
@@ -61,10 +64,7 @@ Config Config::load_from_env() {
     
     // Load configuration from .env file (searches multiple locations)
     load_from_env_file(config);
-    std::cout << "Discord Webhook URL: " << config.discord_webhook_url << std::endl;
-    std::cout << "Leetify API Key: " << config.leetify_api_key << std::endl;
-    std::cout << "OpenAI API Key: " << config.openai_api_key << std::endl;
-    std::cout << "Tracked Steam IDs: " << config.tracked_steam_ids.size() << std::endl;
+
     // Validate required fields
     if (config.discord_webhook_url.empty() || 
         config.leetify_api_key.empty() || 

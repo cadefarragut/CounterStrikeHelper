@@ -1,9 +1,12 @@
-#include "openai_client.h"
 #define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "openai_client.h"
 #include "httplib.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <nlohmann/json.hpp>
+#include <optional>
+using json = nlohmann::json;
 
 OpenAIClient::OpenAIClient(const std::string& api_key) : api_key_(api_key) {}
 
@@ -20,7 +23,6 @@ std::string OpenAIClient::generate_player_comment(const PlayerStats& player, con
     prompt << "Player: " << player.name << "\n";
     prompt << "K/D: " << player.kills << "/" << player.deaths << "\n";
     prompt << "ADR: " << player.adr << "\n";
-    prompt << "Rating: " << std::fixed << std::setprecision(2) << player.rating << "\n";
     prompt << "Match result: " << (player.won_match ? "Won" : "Lost") << "\n";
     prompt << "Map: " << match.map_name << "\n";
     prompt << "Keep it light-hearted and entertaining!";
@@ -36,17 +38,16 @@ std::string OpenAIClient::build_comment_prompt(const MatchData& match,
     prompt << "Be playful and humorous - roast them if they did bad, celebrate if they did well. ";
     prompt << "Keep it 3-4 sentences max. Match details:\n\n";
     prompt << "Map: " << match.map_name << "\n";
-    prompt << "Game Mode: " << match.game_mode << "\n\n";
     prompt << "Tracked Players:\n";
     
-    for (const auto& steam_id : tracked_steam_ids) {
+   /* for (const auto& steam_id : tracked_steam_ids) {
         const PlayerStats* player = match.get_player_stats(steam_id);
         if (player) {
             prompt << "- " << player->name << ": K/D " << player->kills << "/" << player->deaths;
-            prompt << ", ADR " << player->adr << ", Rating " << std::fixed << std::setprecision(2) << player->rating;
+            prompt << ", ADR " << player->adr;
             prompt << " (" << (player->won_match ? "Won" : "Lost") << ")\n";
         }
-    }
+    } */
     
     return prompt.str();
 }

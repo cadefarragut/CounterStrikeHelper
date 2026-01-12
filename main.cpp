@@ -9,6 +9,9 @@
 #include "discord_client.h"
 #include "openai_client.h"
 #include "match_data.h"
+#include <nlohmann/json.hpp>
+#include <optional>
+using json = nlohmann::json;
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.h"
@@ -41,32 +44,20 @@ int main() {
         try {
             // Fetch matches for each tracked Steam ID
             for (const auto& steam_id : config.tracked_steam_ids) {
-                std::cout << "Fetching matches for Steam ID: " << steam_id << std::endl;
+                std::cout << "Fetching recent match for Steam ID: " << steam_id << std::endl;
                 
                 // Fetch recent matches (last 5 to check for new ones)
-                auto matches = leetify_client.fetch_matches(steam_id, 5);
-                std::cout << "Found " << matches.size() << " matches from API" << std::endl;
-                
-                for (const auto& match : matches) {
-                    std::cout << "Processing match: " << match.match_id << std::endl;
-                    
-                    // Check if we've already processed this match
-                    if (seen_match_ids.find(match.match_id) != seen_match_ids.end()) {
-                        std::cout << "  -> Already seen, skipping" << std::endl;
-                        continue;
-                    }
-                    
-                    // We now parse player stats from the list response, so we can check tracked players directly
-                    if (!match.has_tracked_players(config.tracked_steam_ids)) {
-                        std::cout << "  -> Match doesn't contain tracked players, skipping" << std::endl;
-                        // Still mark as seen to avoid re-checking
-                        seen_match_ids.insert(match.match_id);
-                        continue;
-                    }
-                    
-                    std::cout << "  -> Match contains tracked players! Processing..." << std::endl;
-                    std::cout << "New match found: " << match.match_id << " on " << match.map_name << std::endl;
-                    
+                auto match = leetify_client.fetch_recent_match(steam_id);   
+
+                if (match.match_id.empty()) {
+                    std::cout << "  -> No match returned (fetch failed or no matches)\n";
+                    continue;
+                }
+    
+                    //std::cout << "Processing match: " << match.match_id << std::endl;
+                    {
+                    /*   
+
                     // Use the already-parsed match data (no extra API call)
                     MatchData detailed_match = match;
                     
@@ -97,7 +88,8 @@ int main() {
                     
                     // Small delay between processing matches
                     std::this_thread::sleep_for(std::chrono::seconds(2));
-                }
+                    */
+                } 
             }
             
             std::cout << "Polling cycle complete. Waiting " << config.poll_interval_seconds 

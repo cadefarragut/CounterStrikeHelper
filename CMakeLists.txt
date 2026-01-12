@@ -24,6 +24,7 @@ set(HEADERS
     include/openai_client.h
     include/match_data.h
     include/config.h
+    include/json.hpp
 )
 
 # Add executable

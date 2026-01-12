@@ -9,7 +9,7 @@ public:
     LeetifyClient(const std::string& api_key);
     
     // Fetch matches for a specific Steam ID
-    std::vector<MatchData> fetch_matches(const std::string& steam64_id, int limit = 10);
+    MatchData fetch_recent_match(const std::string& steam64_id);
     
     // Fetch detailed match data by match ID
     MatchData fetch_match_details(const std::string& match_id);

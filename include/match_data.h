@@ -4,26 +4,25 @@
 #include <vector>
 #include <unordered_map>
 #include <ctime>
+#include <nlohmann/json.hpp>
+#include <optional>
+using json = nlohmann::json;
 
 struct PlayerStats {
     std::string steam_id;
     std::string name;
-    double rating;
-    double leetify_rating;
     int kills;
     int deaths;
     int assists;
     double kd_ratio;
     int headshot_percentage;
-    int adr;  // Average Damage per Round
+    int adr;  
     bool won_match;
 };
 
 struct MatchData {
     std::string match_id;
-    std::time_t timestamp;
     std::string map_name;
-    std::string game_mode;
     std::vector<PlayerStats> players;
     
     // Get stats for a specific Steam ID (const version)
@@ -34,5 +33,6 @@ struct MatchData {
 };
 
 // Parse JSON response from Leetify API
-MatchData parse_match_from_json(const std::string& json, const std::string& match_id);
-std::vector<MatchData> parse_matches_list_from_json(const std::string& json);
+MatchData parse_match_details_from_json(const std::string& body, const std::string& match_id);
+std::string parse_most_recent_match_id(const std::string& body);
+

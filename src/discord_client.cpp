@@ -4,6 +4,9 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <nlohmann/json.hpp>
+#include <optional>
+using json = nlohmann::json;
 
 DiscordClient::DiscordClient(const std::string& webhook_url) : webhook_url_(webhook_url) {
     webhook_path_ = extract_webhook_path(webhook_url);
@@ -69,8 +72,8 @@ bool DiscordClient::send_match_report(const MatchData& match, const std::string&
         field << player.name << "\n"
               << "K/D: " << player.kills << "/" << player.deaths 
               << " (" << std::fixed << std::setprecision(2) << player.kd_ratio << ")\n"
-              << "ADR: " << player.adr << "\n"
-              << "Rating: " << std::fixed << std::setprecision(2) << player.rating;
+              << "ADR: " << player.adr << "\n";
+              //<< "Rating: " << std::fixed << std::setprecision(2) << player.rating;
         
         json << R"(,{"name":")" << escape_json(player.name) 
              << R"(","value":")" << escape_json(field.str()) << R"(","inline":true})";
@@ -108,8 +111,8 @@ bool DiscordClient::send_embed(const std::string& title, const std::string& desc
     for (const auto& player : players) {
         std::ostringstream field;
         field << "K/D: " << player.kills << "/" << player.deaths 
-              << " | ADR: " << player.adr 
-              << " | Rating: " << std::fixed << std::setprecision(2) << player.rating;
+              << " | ADR: " << player.adr;
+         //     << " | Rating: " << std::fixed << std::setprecision(2) << player.rating;
         
         json << R"(,{"name":")" << escape_json(player.name)
              << R"(","value":")" << escape_json(field.str()) << R"(","inline":false})";
