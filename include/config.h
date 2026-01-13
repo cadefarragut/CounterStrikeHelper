@@ -27,7 +27,7 @@ struct Config {
     bool is_valid() const;
     
 private:
-    // Helper to parse .env file (checks ../.env first, then .env)
+    // Helper to parse .env file
     static void load_from_env_file(Config& config);
     
     // Helper to parse Steam IDs (comma-separated format)

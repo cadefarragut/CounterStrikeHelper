@@ -16,16 +16,13 @@ public:
     
     // Send a formatted embed with match stats
     bool send_embed(const std::string& title, const std::string& description, 
-                   const std::vector<PlayerStats>& players, const std::string& footer);
+                    const std::vector<PlayerStats>& players, const std::string& footer);
     
 private:
     std::string webhook_url_;
-    std::string webhook_path_;  // Just the path portion of the webhook URL
+    std::string webhook_path_;
     std::string base_url_ = "https://discord.com";
     
-    // Helper to escape JSON strings
     std::string escape_json(const std::string& str);
-    
-    // Helper to parse webhook URL and extract path
     std::string extract_webhook_path(const std::string& webhook_url);
 };

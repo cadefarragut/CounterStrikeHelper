@@ -11,28 +11,24 @@ include_directories(include)
 set(SOURCES
     src/leetify_client.cpp
     src/discord_client.cpp
-    src/openai_client.cpp
+    src/ai_client.cpp
     src/match_data.cpp
     src/config.cpp
     main.cpp
 )
 
-# Header files
-set(HEADERS
-    include/leetify_client.h
-    include/discord_client.h
-    include/openai_client.h
-    include/match_data.h
-    include/config.h
-    include/json.hpp
-)
-
 # Add executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Link OpenSSL for httplib
+# Find and link OpenSSL
 find_package(OpenSSL REQUIRED)
 target_link_libraries(${PROJECT_NAME} OpenSSL::SSL OpenSSL::Crypto)
+
+# Link pthread on Unix
+if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(${PROJECT_NAME} Threads::Threads)
+endif()
 
 # Compiler flags
 if(MSVC)
@@ -41,7 +37,7 @@ else()
     target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -pedantic)
 endif()
 
-# Copy .env file to build directory if it exists (optional - only copies if source exists)
+# Copy .env file to build directory if it exists
 if(EXISTS "${CMAKE_SOURCE_DIR}/.env")
     configure_file("${CMAKE_SOURCE_DIR}/.env" "${CMAKE_BINARY_DIR}/.env" COPYONLY)
     message(STATUS ".env file will be copied to build directory")

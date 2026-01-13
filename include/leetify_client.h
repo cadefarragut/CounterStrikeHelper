@@ -8,7 +8,7 @@ class LeetifyClient {
 public:
     LeetifyClient(const std::string& api_key);
     
-    // Fetch matches for a specific Steam ID
+    // Fetch the most recent match for a Steam ID
     MatchData fetch_recent_match(const std::string& steam64_id);
     
     // Fetch detailed match data by match ID

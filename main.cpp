@@ -1,109 +1,170 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
-#include <unordered_set>
-#include <vector>
-#include <memory>
+#include <csignal>
+#include <atomic>
+
 #include "config.h"
 #include "leetify_client.h"
 #include "discord_client.h"
-#include "openai_client.h"
+#include "ai_client.h"
 #include "match_data.h"
-#include <nlohmann/json.hpp>
-#include <optional>
-using json = nlohmann::json;
+#include "persistence.h"
 
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "httplib.h"
+// Global flag for graceful shutdown (Ctrl+C)
+std::atomic<bool> g_running{true};
+
+void signal_handler(int signal) {
+    std::cout << "\n[main] Received signal " << signal << ", shutting down...\n";
+    g_running = false;
+}
+
+void print_banner() {
+    std::cout << R"(
+   ____  ____  ____    _   _      _                 
+  / ___|/ ___|/ ___|  | | | | ___| |_ __   ___ _ __ 
+ | |    \___ \\___ \  | |_| |/ _ \ | '_ \ / _ \ '__|
+ | |___  ___) |___) | |  _  |  __/ | |_) |  __/ |   
+  \____||____/____/  |_| |_|\___|_| .__/ \___|_|   
+                                  |_|               
+)" << '\n';
+    std::cout << "Counter-Strike 2 Match Tracker & Discord Reporter\n";
+    std::cout << "=================================================\n\n";
+}
 
 int main() {
-    std::cout << "CounterStrike Helper - Starting..." << std::endl;
+    print_banner();
+    
+    // Setup signal handler for graceful shutdown
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
     
     // Load configuration
     Config config = Config::load_from_env();
     if (!config.is_valid()) {
-        std::cerr << "Error: Invalid configuration. Please check your environment variables." << std::endl;
+        std::cerr << "Error: Invalid configuration. Please check your .env file.\n";
         return 1;
     }
     
-    std::cout << "Configuration loaded successfully!" << std::endl;
-    std::cout << "Tracking " << config.tracked_steam_ids.size() << " Steam ID(s)" << std::endl;
-    std::cout << "Poll interval: " << config.poll_interval_seconds << " seconds" << std::endl;
+    std::cout << "Configuration loaded successfully!\n";
+    std::cout << "Tracking " << config.tracked_steam_ids.size() << " Steam ID(s):\n";
+    for (const auto& id : config.tracked_steam_ids) {
+        std::cout << "  - " << id << "\n";
+    }
+    std::cout << "Poll interval: " << config.poll_interval_seconds << " seconds\n\n";
     
     // Initialize clients
     LeetifyClient leetify_client(config.leetify_api_key);
     DiscordClient discord_client(config.discord_webhook_url);
     OpenAIClient openai_client(config.openai_api_key);
     
-    // Store seen match IDs to avoid duplicates
-    std::unordered_set<std::string> seen_match_ids;
+    // Load persistence (remembered match IDs)
+    PersistenceManager persistence("seen_matches.txt");
+    persistence.load();
+    
+    // Send startup message to Discord
+    discord_client.send_message("🎮 CS2 Match Tracker is now online! Monitoring " + 
+                                std::to_string(config.tracked_steam_ids.size()) + " player(s).");
+    
+    std::cout << "Starting polling loop (Ctrl+C to stop)...\n\n";
     
     // Main polling loop
-    std::cout << "Starting polling loop..." << std::endl;
-    //while (true) {
+    while (g_running) {
         try {
-            // Fetch matches for each tracked Steam ID
             for (const auto& steam_id : config.tracked_steam_ids) {
-                std::cout << "Fetching recent match for Steam ID: " << steam_id << std::endl;
+                if (!g_running) break;
                 
-                // Fetch recent matches (last 5 to check for new ones)
-                auto match = leetify_client.fetch_recent_match(steam_id);   
-
+                std::cout << "[poll] Checking for new matches for Steam ID: " << steam_id << "\n";
+                
+                // Fetch the most recent match
+                MatchData match = leetify_client.fetch_recent_match(steam_id);
+                
                 if (match.match_id.empty()) {
-                    std::cout << "  -> No match returned (fetch failed or no matches)\n";
+                    std::cout << "  -> No match found or fetch failed\n";
                     continue;
                 }
-    
-                    //std::cout << "Processing match: " << match.match_id << std::endl;
-                    {
-                    /*   
-
-                    // Use the already-parsed match data (no extra API call)
-                    MatchData detailed_match = match;
-                    
-                    // Generate comment using OpenAI
-                    std::cout << "  -> Generating match comment..." << std::endl;
-                    std::string comment = openai_client.generate_match_comment(detailed_match, config.tracked_steam_ids);
-                    
-                    // Check if comment generation failed
-                    if (comment == "Error generating comment" || comment.empty()) {
-                        std::cerr << "  -> ERROR: Failed to generate comment, skipping Discord send" << std::endl;
-                        seen_match_ids.insert(detailed_match.match_id);  // Mark as seen to avoid retrying
-                        continue;
-                    }
-                    
-                    std::cout << "  -> Generated comment: " << comment.substr(0, 100) << "..." << std::endl;
-                    
-                    // Send to Discord
-                    std::cout << "  -> Sending match report to Discord..." << std::endl;
-                    bool success = discord_client.send_match_report(detailed_match, comment);
-                    
-                    if (success) {
-                        std::cout << "  -> Match report sent successfully!" << std::endl;
-                        // Mark as seen
-                        seen_match_ids.insert(detailed_match.match_id);
-                    } else {
-                        std::cerr << "  -> ERROR: Failed to send match report to Discord" << std::endl;
-                    }
-                    
-                    // Small delay between processing matches
-                    std::this_thread::sleep_for(std::chrono::seconds(2));
-                    */
-                } 
+                
+                // Check if we've already processed this match
+                if (persistence.has_seen(match.match_id)) {
+                    std::cout << "  -> Match " << match.match_id << " already processed, skipping\n";
+                    continue;
+                }
+                
+                // NEW MATCH FOUND!
+                std::cout << "\n*** NEW MATCH DETECTED ***\n";
+                std::cout << "  Match ID: " << match.match_id << "\n";
+                std::cout << "  Map: " << match.map_name << "\n";
+                std::cout << "  Score: " << match.get_score_string() << "\n";
+                
+                // Get the tracked player's stats from this match
+                auto tracked_players = match.get_tracked_players(config.tracked_steam_ids);
+                
+                if (tracked_players.empty()) {
+                    std::cout << "  -> No tracked players found in match (unexpected)\n";
+                    persistence.mark_seen_and_save(match.match_id);
+                    continue;
+                }
+                
+                // Print tracked player stats
+                std::cout << "  Tracked player stats:\n";
+                for (const auto& player : tracked_players) {
+                    std::cout << "    " << player.name 
+                              << " - K/D/A: " << player.kills << "/" << player.deaths << "/" << player.assists
+                              << " | ADR: " << player.adr
+                              << " | HS%: " << player.headshot_percentage << "%"
+                              << " | " << (player.won_match ? "WIN" : "LOSS") << "\n";
+                }
+                
+                // Generate AI comment about the match
+                std::cout << "\n  -> Generating AI commentary...\n";
+                std::string comment = openai_client.generate_match_comment(match, config.tracked_steam_ids);
+                
+                if (comment.empty() || comment == "Error generating comment") {
+                    std::cerr << "  -> Failed to generate AI comment, using fallback\n";
+                    // Create a simple fallback comment
+                    const auto& p = tracked_players[0];
+                    comment = p.name + " just finished a game on " + match.map_name + 
+                              " with a " + std::to_string(p.kills) + "/" + std::to_string(p.deaths) + 
+                              " K/D. " + (p.won_match ? "They won!" : "Tough loss.");
+                }
+                
+                std::cout << "  -> AI Comment: " << comment << "\n";
+                
+                // Send to Discord
+                std::cout << "  -> Sending to Discord...\n";
+                bool discord_success = discord_client.send_match_report(match, comment);
+                
+                if (discord_success) {
+                    std::cout << "  -> Successfully posted to Discord!\n";
+                } else {
+                    std::cerr << "  -> Failed to post to Discord\n";
+                }
+                
+                // Mark match as seen (so we don't process it again)
+                persistence.mark_seen_and_save(match.match_id);
+                std::cout << "  -> Match marked as processed\n\n";
+                
+                // Small delay between processing matches
+                std::this_thread::sleep_for(std::chrono::seconds(2));
             }
             
-            std::cout << "Polling cycle complete. Waiting " << config.poll_interval_seconds 
-                      << " seconds until next cycle..." << std::endl;
-            
         } catch (const std::exception& e) {
-            std::cerr << "Error in polling loop: " << e.what() << std::endl;
-            // Send error notification to Discord
-            discord_client.send_message("⚠️ Error in polling loop: " + std::string(e.what()));
+            std::cerr << "[error] Exception in polling loop: " << e.what() << "\n";
+            discord_client.send_message("⚠️ Error in match tracker: " + std::string(e.what()));
         }
         
-        // Wait before next poll
-        std::this_thread::sleep_for(std::chrono::seconds(config.poll_interval_seconds));
-    //}
+        // Wait before next poll (interruptible for quick shutdown)
+        std::cout << "[poll] Waiting " << config.poll_interval_seconds << " seconds until next check...\n";
+        for (int i = 0; i < config.poll_interval_seconds && g_running; ++i) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
     
+    // Cleanup
+    std::cout << "\n[main] Saving state and shutting down...\n";
+    persistence.save();
+    discord_client.send_message("👋 CS2 Match Tracker is going offline.");
+    
+    std::cout << "[main] Goodbye!\n";
     return 0;
 }
