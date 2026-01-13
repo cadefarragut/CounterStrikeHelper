@@ -69,8 +69,7 @@ It remembers which matches it's already posted about in `seen_matches.txt`, so y
 │   ├── leetify_client.h
 │   ├── match_data.h
 │   ├── persistence.h
-│   ├── httplib.h
-│   └── nlohmann/json.hpp
+│   └── httplib.h
 ├── src/
 │   ├── ai_client.cpp
 │   ├── config.cpp
