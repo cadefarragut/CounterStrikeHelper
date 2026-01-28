@@ -53,22 +53,62 @@ bool DiscordClient::send_match_report(const MatchData& match, const std::string&
     httplib::Client cli(base_url_);
     cli.set_connection_timeout(30, 0);
     cli.set_read_timeout(30, 0);
-    
+
     // Just send the AI comment as a simple message
     // Include map and score as a header, then the comment
     std::ostringstream message;
     message << "🎮 **" << match.map_name << "** (" << match.get_score_string() << ")\n\n";
     message << comment;
-    
+
     json payload;
     payload["content"] = message.str();
-    
+
     auto res = cli.Post(webhook_path_, payload.dump(), "application/json");
-    
+
     if (res && res->status >= 200 && res->status < 300) {
         return true;
     } else {
         std::cerr << "[discord] Error sending match report: ";
+        if (res) {
+            std::cerr << "Status " << res->status << ", Body: " << res->body.substr(0, 200) << "\n";
+        } else {
+            std::cerr << "Connection failed\n";
+        }
+        return false;
+    }
+}
+
+bool DiscordClient::send_multi_player_report(const MatchData& match,
+                                              const std::vector<PlayerStats>& tracked_players,
+                                              const std::map<std::string, std::string>& player_comments) {
+    httplib::Client cli(base_url_);
+    cli.set_connection_timeout(30, 0);
+    cli.set_read_timeout(30, 0);
+
+    std::ostringstream message;
+    message << "🎮 **" << match.map_name << "** (" << match.get_score_string() << ")\n";
+
+    for (const auto& player : tracked_players) {
+        message << "\n**" << player.name << "** ";
+        message << "(" << player.kills << "/" << player.deaths << "/" << player.assists;
+        message << ", ADR " << player.adr << ") ";
+        message << (player.won_match ? "WIN" : "LOSS") << "\n";
+
+        auto it = player_comments.find(player.steam_id);
+        if (it != player_comments.end() && !it->second.empty()) {
+            message << it->second << "\n";
+        }
+    }
+
+    json payload;
+    payload["content"] = message.str();
+
+    auto res = cli.Post(webhook_path_, payload.dump(), "application/json");
+
+    if (res && res->status >= 200 && res->status < 300) {
+        return true;
+    } else {
+        std::cerr << "[discord] Error sending multi-player report: ";
         if (res) {
             std::cerr << "Status " << res->status << ", Body: " << res->body.substr(0, 200) << "\n";
         } else {

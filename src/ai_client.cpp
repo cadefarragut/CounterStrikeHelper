@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <nlohmann/json.hpp>
+#include <regex>
 
 using json = nlohmann::json;
 
@@ -14,6 +15,134 @@ std::string AIClient::generate_match_comment(const MatchData& match,
                                              const std::vector<std::string>& tracked_steam_ids) {
     std::string prompt = build_comment_prompt(match, tracked_steam_ids);
     return make_api_request(prompt);
+}
+
+std::map<std::string, std::string> AIClient::generate_multi_player_comments(
+    const MatchData& match,
+    const std::vector<PlayerStats>& tracked_players) {
+
+    std::map<std::string, std::string> result;
+
+    if (tracked_players.empty()) {
+        return result;
+    }
+
+    // If only one tracked player, use the simpler single-player method
+    if (tracked_players.size() == 1) {
+        std::string comment = generate_player_comment(tracked_players[0], match);
+        result[tracked_players[0].steam_id] = comment;
+        return result;
+    }
+
+    // Build prompt for multiple players
+    std::string prompt = build_multi_player_prompt(match, tracked_players);
+    std::string response = make_api_request(prompt);
+
+    // Parse the response - expect format like:
+    // [PlayerName1]: comment here
+    // [PlayerName2]: comment here
+    for (const auto& player : tracked_players) {
+        // Try to find this player's section in the response
+        std::string pattern = "\\[" + player.name + "\\]:?\\s*";
+        std::regex player_regex(pattern, std::regex::icase);
+        std::smatch match_result;
+
+        if (std::regex_search(response, match_result, player_regex)) {
+            // Find where this player's comment starts
+            size_t start = match_result.position() + match_result.length();
+            // Find where the next player's comment starts (or end of string)
+            size_t end = response.length();
+
+            for (const auto& other : tracked_players) {
+                if (other.steam_id == player.steam_id) continue;
+                std::string other_pattern = "\\[" + other.name + "\\]:?";
+                std::regex other_regex(other_pattern, std::regex::icase);
+                std::smatch other_match;
+                std::string remaining = response.substr(start);
+                if (std::regex_search(remaining, other_match, other_regex)) {
+                    size_t other_pos = start + other_match.position();
+                    if (other_pos < end) {
+                        end = other_pos;
+                    }
+                }
+            }
+
+            std::string comment = response.substr(start, end - start);
+            // Trim whitespace and newlines
+            size_t first = comment.find_first_not_of(" \n\r\t");
+            size_t last = comment.find_last_not_of(" \n\r\t");
+            if (first != std::string::npos && last != std::string::npos) {
+                comment = comment.substr(first, last - first + 1);
+            }
+            result[player.steam_id] = comment;
+        }
+    }
+
+    // Fallback: if parsing failed for any player, generate individual comments
+    for (const auto& player : tracked_players) {
+        if (result.find(player.steam_id) == result.end() || result[player.steam_id].empty()) {
+            std::cout << "  -> Fallback: generating individual comment for " << player.name << "\n";
+            result[player.steam_id] = generate_player_comment(player, match);
+        }
+    }
+
+    return result;
+}
+
+std::string AIClient::build_multi_player_prompt(const MatchData& match,
+                                                const std::vector<PlayerStats>& tracked_players) {
+    std::ostringstream prompt;
+    prompt << "You are a witty CS2 match commentator for a Discord server. ";
+    prompt << "Write SHORT, funny comments for EACH of the tracked players below. ";
+    prompt << "Roast players who did bad, celebrate those who did well. ";
+    prompt << "Keep each comment to 1-2 sentences. Be creative and reference specific stats!\n\n";
+
+    prompt << "IMPORTANT: Format your response EXACTLY like this, with each player on their own line:\n";
+    for (const auto& player : tracked_players) {
+        prompt << "[" << player.name << "]: (your comment here)\n";
+    }
+    prompt << "\n";
+
+    prompt << "Match details:\n";
+    prompt << "Map: " << match.map_name << "\n";
+    prompt << "Score: " << match.get_score_string() << "\n\n";
+
+    prompt << "=== TRACKED PLAYERS ===\n";
+    for (const auto& player : tracked_players) {
+        prompt << "- " << player.name << ": ";
+        prompt << "K/D/A " << player.kills << "/" << player.deaths << "/" << player.assists;
+        prompt << ", ADR " << player.adr;
+        prompt << ", HS% " << player.headshot_percentage << "%";
+        prompt << ", KD " << std::fixed << std::setprecision(2) << player.kd_ratio;
+        prompt << " (" << (player.won_match ? "WON" : "LOST") << ")\n";
+    }
+
+    // Add context about other players
+    std::vector<const PlayerStats*> others;
+    for (const auto& player : match.players) {
+        bool is_tracked = false;
+        for (const auto& tp : tracked_players) {
+            if (player.steam_id == tp.steam_id) {
+                is_tracked = true;
+                break;
+            }
+        }
+        if (!is_tracked) {
+            others.push_back(&player);
+        }
+    }
+
+    if (!others.empty()) {
+        prompt << "\n=== OTHER PLAYERS (for context) ===\n";
+        for (const auto* player : others) {
+            prompt << "- " << player->name << ": ";
+            prompt << "K/D/A " << player->kills << "/" << player->deaths << "/" << player->assists;
+            prompt << ", ADR " << player->adr << "\n";
+        }
+    }
+
+    prompt << "\nNow write a short, witty comment for each tracked player:";
+    return prompt.str();
 }
 
 std::string AIClient::generate_player_comment(const PlayerStats& player, const MatchData& match) {
