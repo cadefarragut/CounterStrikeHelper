@@ -37,7 +37,7 @@ Create a `.env` file in the build folder:
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxxxx/xxxxx
 LEETIFY_API_KEY=your_leetify_key
 GROQ_API_KEY=gsk_xxxxx
-TRACKED_STEAM_IDS=76561198012345678,76561198087654321
+TRACKED_STEAM_IDS=steamid1,steamid2
 POLL_INTERVAL_SECONDS=60
 ```
 
@@ -69,8 +69,7 @@ It remembers which matches it's already posted about in `seen_matches.txt`, so y
 │   ├── leetify_client.h
 │   ├── match_data.h
 │   ├── persistence.h
-│   ├── httplib.h
-│   └── nlohmann/json.hpp
+│   └── httplib.h
 ├── src/
 │   ├── ai_client.cpp
 │   ├── config.cpp
