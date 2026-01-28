@@ -32,3 +32,6 @@ Makefile
 
 # Logs
 *.log
+
+#claude
+CLAUDE.md
