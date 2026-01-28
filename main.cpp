@@ -62,11 +62,32 @@ int main() {
     // Load persistence (remembered match IDs)
     PersistenceManager persistence("seen_matches.txt");
     persistence.load();
-    
+
+    // Silent initialization: if this is a fresh start (no seen matches),
+    // mark current matches as seen without posting to avoid stale match spam
+    if (persistence.is_empty()) {
+        std::cout << "[init] First run detected - performing silent initialization...\n";
+        std::cout << "[init] Marking current matches as seen (won't post stale matches)\n";
+
+        for (const auto& steam_id : config.tracked_steam_ids) {
+            std::cout << "[init] Checking current match for Steam ID: " << steam_id << "\n";
+            MatchData match = leetify_client.fetch_recent_match(steam_id);
+
+            if (!match.match_id.empty()) {
+                std::cout << "[init]   -> Marking match " << match.match_id << " as seen\n";
+                persistence.mark_seen_and_save(match.match_id);
+            } else {
+                std::cout << "[init]   -> No match found for this player\n";
+            }
+        }
+
+        std::cout << "[init] Silent initialization complete. Only new matches will be posted.\n\n";
+    }
+
     // Send startup message to Discord
-    discord_client.send_message("🎮 CS2 Match Tracker is now online! Monitoring " + 
+    discord_client.send_message("🎮 CS2 Match Tracker is now online! Monitoring " +
                                 std::to_string(config.tracked_steam_ids.size()) + " player(s).");
-    
+
     std::cout << "Starting polling loop (Ctrl+C to stop)...\n\n";
     
     // Main polling loop

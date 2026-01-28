@@ -70,7 +70,10 @@ public:
     
     // Get count of seen matches
     size_t size() const { return seen_match_ids_.size(); }
-    
+
+    // Check if no matches have been seen (first run)
+    bool is_empty() const { return seen_match_ids_.empty(); }
+
     // Clear all seen matches
     void clear() { seen_match_ids_.clear(); }
     

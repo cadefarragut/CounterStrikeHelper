@@ -92,10 +92,13 @@ std::map<std::string, std::string> AIClient::generate_multi_player_comments(
 std::string AIClient::build_multi_player_prompt(const MatchData& match,
                                                 const std::vector<PlayerStats>& tracked_players) {
     std::ostringstream prompt;
-    prompt << "You are a witty CS2 match commentator for a Discord server. ";
-    prompt << "Write SHORT, funny comments for EACH of the tracked players below. ";
-    prompt << "Roast players who did bad, celebrate those who did well. ";
-    prompt << "Keep each comment to 1-2 sentences. Be creative and reference specific stats!\n\n";
+    prompt << "You are a SAVAGE CS2 match commentator for a Discord server full of friends who roast each other. ";
+    prompt << "Write SHORT but BRUTAL comments for EACH of the tracked players below. ";
+    prompt << "If someone did BAD: be absolutely ruthless - question their skill, mock their stats, suggest they uninstall, ";
+    prompt << "compare them to bots, say they were boosted, imply they were AFK, be creative and MEAN. ";
+    prompt << "If someone did GOOD: go full simp mode - call them a god, say they hard carried, worship their aim, ";
+    prompt << "say the enemies should uninstall, glaze them like they're the next s1mple. ";
+    prompt << "Keep each comment to 1-2 sentences. Reference specific stats to make the roasts/praise hit harder!\n\n";
 
     prompt << "IMPORTANT: Format your response EXACTLY like this, with each player on their own line:\n";
     for (const auto& player : tracked_players) {
@@ -147,28 +150,34 @@ std::string AIClient::build_multi_player_prompt(const MatchData& match,
 
 std::string AIClient::generate_player_comment(const PlayerStats& player, const MatchData& match) {
     std::ostringstream prompt;
-    prompt << "Write a funny, short comment (2-3 sentences max) about this CS2 match performance. ";
-    prompt << "Be playful and humorous - make fun if they did bad, praise if they did good. ";
+    prompt << "Write a SAVAGE comment (1-2 sentences) about this CS2 match performance. ";
+    prompt << "If they did BAD: be absolutely BRUTAL - mock their stats, question if they were AFK, ";
+    prompt << "suggest they uninstall, say they got carried, compare them to Silver players. Be MEAN. ";
+    prompt << "If they did GOOD: worship them like a god - full simp mode, call them insane, ";
+    prompt << "say they hard carried, compare them to pro players, glaze them hard. ";
     prompt << "Player: " << player.name << "\n";
     prompt << "K/D: " << player.kills << "/" << player.deaths << "\n";
     prompt << "ADR: " << player.adr << "\n";
     prompt << "Headshot %: " << player.headshot_percentage << "%\n";
     prompt << "Match result: " << (player.won_match ? "Won" : "Lost") << "\n";
     prompt << "Map: " << match.map_name << "\n";
-    prompt << "Keep it light-hearted and entertaining!";
-    
+    prompt << "Reference their specific stats to make it hit harder!";
+
     return make_api_request(prompt.str());
 }
 
 std::string AIClient::build_comment_prompt(const MatchData& match,
                                            const std::vector<std::string>& tracked_steam_ids) {
     std::ostringstream prompt;
-    prompt << "You are a witty CS2 match commentator for a Discord server. ";
-    prompt << "Write a funny, entertaining comment about this CS2 match. ";
-    prompt << "Focus mainly on the TRACKED players but feel free to roast or mention enemies who dominated them, ";
-    prompt << "or teammates who carried/fed. ";
-    prompt << "Be playful and humorous - roast players who did bad, celebrate those who did well. ";
-    prompt << "Keep it 2-3 sentences max. Be creative and specific about the stats!\n\n";
+    prompt << "You are a SAVAGE CS2 match commentator for a Discord server full of friends who love roasting each other. ";
+    prompt << "Write a BRUTAL or WORSHIPING comment about this CS2 match. ";
+    prompt << "Focus mainly on the TRACKED players but feel free to roast enemies who dominated them, ";
+    prompt << "or mock teammates who fed. ";
+    prompt << "If they did BAD: be absolutely ruthless - question their existence, mock their pathetic stats, ";
+    prompt << "suggest they go back to Valorant, imply they were boosted or AFK. Be MEAN and creative. ";
+    prompt << "If they did GOOD: full simp mode - call them a literal god, say they carried their trash teammates, ";
+    prompt << "compare them to pro players, worship their aim. ";
+    prompt << "Keep it 2-3 sentences max. Reference specific stats to make it hit harder!\n\n";
     
     prompt << "Match details:\n";
     prompt << "Map: " << match.map_name << "\n";
@@ -255,7 +264,7 @@ std::string AIClient::make_api_request(const std::string& prompt) {
     
     json system_msg;
     system_msg["role"] = "system";
-    system_msg["content"] = "You are a witty CS2 match commentator. Keep responses short, funny, and savage. Roast bad performances, hype good ones. Mention specific stats.";
+    system_msg["content"] = "You are a BRUTAL CS2 match commentator for a Discord of friends who roast each other mercilessly. Be absolutely SAVAGE to bad performers - mock them, question their skill, suggest they uninstall, be creative and MEAN. For good performers, go full simp - worship them like gods, glaze them hard, say they carried. Always reference specific stats. Keep it short but devastating or worshiping.";
     request_body["messages"].push_back(system_msg);
     
     json user_msg;
